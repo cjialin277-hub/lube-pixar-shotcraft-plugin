@@ -1,0 +1,19 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "lube-pixar-shotcraft",
+  "displayName": "Lube 皮克斯 3D 运镜动效工坊 (Pixar Shotcraft Studio)",
+  "version": "1.0.0",
+  "description": "9:16 竖屏皮克斯 3D 动漫科普 × Shotcraft 丝滑运镜与 MG 动效全自动制片插件：内置无商标 3D 角色/剖面出图词法、Omni 1.2 单镜真对口型流程、ElevenLabs eleven_v4 映画级配音与原片拟音保留脚本、Remotion v4 丝滑运镜/综艺花字组件库，以及一键安装 8 大 AI 3D 与动效开源武器库。",
+  "logo": "assets/logo.svg",
+  "homepage": "https://github.com/cjialin277-hub/lube-pixar-shotcraft-plugin",
+  "repository": "https://github.com/cjialin277-hub/lube-pixar-shotcraft-plugin",
+  "author": {
+    "name": "Lube",
+    "url": "https://github.com/cjialin277-hub"
+  },
+  "suggestedPrompts": [
+    "一键安装并挂载 8 大 AI 3D、丝滑运镜与 MG 动效开源武器库到当前工作区",
+    "用皮克斯 3D 动漫 + Shotcraft 丝滑运镜 + ElevenLabs v4 制作一条 9:16 繁简双语科普短片",
+    "把我的科普插页升级为 2.5D 电影运镜（水花光圈切 / 变速时间轴 / 急推撞停）并加上 9:16 弹跳花字"
+  ]
+}
