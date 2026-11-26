@@ -1,0 +1,542 @@
+import React from 'react';
+import {
+  AbsoluteFill,
+  Audio,
+  Easing,
+  OffthreadVideo,
+  Sequence,
+  interpolate,
+  spring,
+  staticFile,
+  useCurrentFrame,
+} from 'remotion';
+import {
+  AilaoDirectorV4,
+  BatteryDirectorV4,
+  ChengjiangDirectorV4,
+  FuxianLakeDirectorV4,
+} from './scenes/ShotcraftDirectorV4';
+import { FONT_MONO, FONT_SANS, Locale } from './scenes/ScienceInserts';
+import { FlashCut } from './shotcraft/FlashCut';
+import { HanaziPop, HanaziSpec } from './shotcraft/HanaziPop';
+import { CinemaFilmFinish, SpeedBlur } from './shotcraft/PolishFX';
+import { SheenSweep } from './shotcraft/ShotcraftCam';
+import { BeatScene, SubtitleItem, YuxiVideoProps } from './YuxiHybridVideo';
+
+const OVERLAP_FRAMES = 12;
+
+/**
+ * Exact local frame inside each 8-second Pixar anime beat where Shen Xi begins her reply!
+ * At `cutLocalFrame`, the virtual camera executes a 6-frame `SpeedBlur` Axial Cut / Reframe
+ * from Setup A (Wide Two-Shot) to Setup B (Focused Hero Close-Up on Shen Xi & her active prop),
+ * turning every 8s video into 2 distinct ~3.8s camera setups!
+ */
+const AXIAL_CUT_SPECS: Record<
+  string,
+  {
+    cutFrame: number;
+    fromScale: number;
+    toScale: number;
+    fromX: number;
+    toX: number;
+    fromY: number;
+    toY: number;
+    toRotY: number;
+  }
+> = {
+  B01: { cutFrame: 122, fromScale: 1.03, toScale: 1.24, fromX: 16, toX: -54, fromY: 0, toY: 18, toRotY: -2.4 },
+  B02: { cutFrame: 92,  fromScale: 1.04, toScale: 1.25, fromX: 14, toX: -48, fromY: 0, toY: 14, toRotY: 2.2 },
+  B04: { cutFrame: 100, fromScale: 1.02, toScale: 1.22, fromX: 10, toX: -42, fromY: 0, toY: 22, toRotY: -2.0 },
+  B06: { cutFrame: 99,  fromScale: 1.03, toScale: 1.26, fromX: 18, toX: -58, fromY: 0, toY: 16, toRotY: 2.4 },
+  B08: { cutFrame: 104, fromScale: 1.03, toScale: 1.24, fromX: 12, toX: -46, fromY: 0, toY: 12, toRotY: -2.2 },
+  B10: { cutFrame: 92,  fromScale: 1.03, toScale: 1.25, fromX: 14, toX: -50, fromY: 0, toY: 18, toRotY: 2.2 },
+  B11: { cutFrame: 110, fromScale: 1.04, toScale: 1.24, fromX: 16, toX: -52, fromY: 0, toY: 16, toRotY: -2.2 },
+  B12: { cutFrame: 107, fromScale: 1.02, toScale: 1.23, fromX: 12, toX: -38, fromY: 0, toY: 20, toRotY: 2.0 },
+};
+
+const HANAZI_MAP: Record<string, { sc: HanaziSpec; tc: HanaziSpec }> = {
+  B01: {
+    sc: { text: '逛半天就走?!', startFrame: 52, durationFrames: 50, top: 205, right: 190, rotateDeg: -5, fontSize: 50, accentStroke: '#0369a1', burst: true },
+    tc: { text: '逛半天就走?!', startFrame: 52, durationFrames: 50, top: 205, right: 190, rotateDeg: -5, fontSize: 50, accentStroke: '#0369a1', burst: true },
+  },
+  B02: {
+    sc: { text: '蓝到像大海!', startFrame: 36, durationFrames: 48, top: 200, left: 68, rotateDeg: -4, fontSize: 52, accentStroke: '#0284c7', fillGradient: 'linear-gradient(180deg, #e0f2fe 0%, #38bdf8 60%, #0284c7 100%)', burst: true },
+    tc: { text: '藍到像大海!', startFrame: 36, durationFrames: 48, top: 200, left: 68, rotateDeg: -4, fontSize: 52, accentStroke: '#0284c7', fillGradient: 'linear-gradient(180deg, #e0f2fe 0%, #38bdf8 60%, #0284c7 100%)', burst: true },
+  },
+  B04: {
+    sc: { text: '2米寒武纪巨兽!', startFrame: 96, durationFrames: 56, top: 208, left: 62, rotateDeg: 3, fontSize: 50, accentStroke: '#7c2d12', burst: true },
+    tc: { text: '2米寒武紀巨獸!', startFrame: 96, durationFrames: 56, top: 208, left: 62, rotateDeg: 3, fontSize: 50, accentStroke: '#7c2d12', burst: true },
+  },
+  B06: {
+    sc: { text: '爆汁冰糖橙!', startFrame: 122, durationFrames: 54, top: 210, right: 190, rotateDeg: -4, fontSize: 52, accentStroke: '#c2410c', fillGradient: 'linear-gradient(180deg, #fef9c3 0%, #fbbf24 55%, #f97316 100%)', burst: true },
+    tc: { text: '爆汁冰糖橙!', startFrame: 122, durationFrames: 54, top: 210, right: 190, rotateDeg: -4, fontSize: 52, accentStroke: '#c2410c', fillGradient: 'linear-gradient(180deg, #fef9c3 0%, #fbbf24 55%, #f97316 100%)', burst: true },
+  },
+  B08: {
+    sc: { text: '比保鲜膜还薄?!', startFrame: 42, durationFrames: 48, top: 176, left: 54, rotateDeg: -3, fontSize: 48, accentStroke: '#065f46', fillGradient: 'linear-gradient(180deg, #ecfdf5 0%, #34d399 58%, #059669 100%)', burst: true },
+    tc: { text: '比保鮮膜還薄?!', startFrame: 42, durationFrames: 48, top: 176, left: 54, rotateDeg: -3, fontSize: 48, accentStroke: '#065f46', fillGradient: 'linear-gradient(180deg, #ecfdf5 0%, #34d399 58%, #059669 100%)', burst: true },
+  },
+  B10: {
+    sc: { text: '764.9亿硬核家底!', startFrame: 34, durationFrames: 52, top: 204, left: 64, rotateDeg: -3, fontSize: 48, accentStroke: '#0369a1', fillGradient: 'linear-gradient(180deg, #e0f2fe 0%, #38bdf8 55%, #0284c7 100%)', burst: true },
+    tc: { text: '764.9億硬核家底!', startFrame: 34, durationFrames: 52, top: 204, left: 64, rotateDeg: -3, fontSize: 48, accentStroke: '#0369a1', fillGradient: 'linear-gradient(180deg, #e0f2fe 0%, #38bdf8 55%, #0284c7 100%)', burst: true },
+  },
+  B11: {
+    sc: { text: '真香警告!', startFrame: 62, durationFrames: 52, top: 205, left: 68, rotateDeg: -5, fontSize: 54, accentStroke: '#9a3412', burst: true },
+    tc: { text: '真香警告!', startFrame: 62, durationFrames: 52, top: 205, left: 68, rotateDeg: -5, fontSize: 54, accentStroke: '#9a3412', burst: true },
+  },
+  B12: {
+    sc: { text: '宝藏玉溪!', startFrame: 48, durationFrames: 52, top: 202, right: 190, rotateDeg: -4, fontSize: 52, accentStroke: '#b45309', fillGradient: 'linear-gradient(180deg, #fffbeb 0%, #fde047 55%, #f59e0b 100%)', burst: true },
+    tc: { text: '寶藏玉溪!', startFrame: 48, durationFrames: 52, top: 202, right: 190, rotateDeg: -4, fontSize: 52, accentStroke: '#b45309', fillGradient: 'linear-gradient(180deg, #fffbeb 0%, #fde047 55%, #f59e0b 100%)', burst: true },
+  },
+};
+
+/**
+ * Pixar 3D Anime Beat Layer with 6-Frame `SpeedBlur` Axial Cut / Reframe on Speaker Switch!
+ */
+const AnimeDirectorLayerV4: React.FC<{ beat: BeatScene; locale: Locale; index: number }> = ({
+  beat,
+  locale,
+  index,
+}) => {
+  const frame = useCurrentFrame();
+  const isTC = locale === 'zh-TW';
+  const videoSrc = beat.video
+    ? beat.video.includes('/')
+      ? beat.video
+      : `videos_v2/${beat.video}`
+    : null;
+
+  const spec = AXIAL_CUT_SPECS[beat.id] ?? {
+    cutFrame: 100,
+    fromScale: 1.03,
+    toScale: 1.24,
+    fromX: 14,
+    toX: -48,
+    fromY: 0,
+    toY: 16,
+    toRotY: -2.2,
+  };
+
+  // Entry DutchRollToLevel (first 22 frames)
+  const entrySettle = interpolate(frame, [0, 22], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+  const sign = index % 2 === 0 ? 1 : -1;
+
+  // 7-Frame Snappy Axial Cut Envelope around `spec.cutFrame` (paired with swoosh-quick / transition-snap SFX!)
+  const cutStart = spec.cutFrame - 3;
+  const cutEnd = spec.cutFrame + 4;
+  const cutP = interpolate(frame, [cutStart, cutEnd], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+
+  // Continuous slow breath within Setup A and Setup B
+  const breath = (frame / Math.max(30, beat.durationInFrames)) * 0.035;
+  const scale = spec.fromScale + (spec.toScale - spec.fromScale) * cutP + breath + entrySettle * 0.03;
+  const tx = spec.fromX + (spec.toX - spec.fromX) * cutP + sign * entrySettle * 16;
+  const ty = spec.fromY + (spec.toY - spec.fromY) * cutP;
+  const rotY = sign * entrySettle * 3.0 + spec.toRotY * cutP;
+  const rotZ = -sign * entrySettle * 1.0;
+
+  // Directional SpeedBlur velocity during the 7-frame axial punch-in
+  const inAxialWhip = frame >= cutStart && frame <= cutEnd;
+  const whipBell = inAxialWhip ? Math.sin(((frame - cutStart) / 7) * Math.PI) : 0;
+  const vx = whipBell * (spec.toX - spec.fromX) * 0.75;
+  const vy = whipBell * (spec.toY - spec.fromY) * 0.75;
+
+  const hanazi = HANAZI_MAP[beat.id] ? (isTC ? HANAZI_MAP[beat.id].tc : HANAZI_MAP[beat.id].sc) : null;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#040c14', overflow: 'hidden', perspective: '1400px' }}>
+      {videoSrc && (
+        <SpeedBlur vx={vx} vy={vy}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              transform: `scale(${scale}) translate3d(${tx}px, ${ty}px, 0px) rotateY(${rotY}deg) rotateZ(${rotZ}deg)`,
+              transformOrigin: 'center 42%',
+            }}
+          >
+            <OffthreadVideo
+              src={staticFile(videoSrc)}
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+        </SpeedBlur>
+      )}
+
+      {/* Subtle optical flash at the exact axial cut peak frame */}
+      {inAxialWhip && (
+        <AbsoluteFill
+          style={{
+            backgroundColor: '#ffffff',
+            opacity: whipBell * 0.14,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 240,
+          background: 'linear-gradient(180deg, rgba(2,8,16,0.48) 0%, transparent 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 620,
+          background: 'linear-gradient(0deg, rgba(2,8,16,0.84) 0%, rgba(2,8,16,0.34) 55%, transparent 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Luxury Chapter Pill with SheenSweep + Live Audio Equalizer + Camera Setup Indicator */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 120,
+          left: 48,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '8px 20px',
+          borderRadius: 999,
+          background: 'linear-gradient(135deg, rgba(6, 18, 32, 0.82) 0%, rgba(4, 12, 22, 0.68) 100%)',
+          border: '1.5px solid rgba(255, 255, 255, 0.28)',
+          boxShadow: '0 10px 28px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.28)',
+          overflow: 'hidden',
+        }}
+      >
+        <SheenSweep startFrame={8} durationFrames={26} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, height: 16 }}>
+          {[0, 1, 2, 3].map((b) => {
+            const h = 5 + Math.abs(Math.sin(frame * 0.28 + b * 1.1)) * 11;
+            return (
+              <div
+                key={b}
+                style={{
+                  width: 3,
+                  height: h,
+                  borderRadius: 2,
+                  backgroundColor: b % 2 === 0 ? '#fde047' : '#38bdf8',
+                }}
+              />
+            );
+          })}
+        </div>
+        <span style={{ fontFamily: FONT_SANS, fontSize: 22, fontWeight: 800, color: '#ffffff' }}>
+          {beat.chapter}
+        </span>
+        <span
+          style={{
+            padding: '2px 8px',
+            borderRadius: 6,
+            backgroundColor: cutP > 0.5 ? 'rgba(52,211,153,0.28)' : 'rgba(56,189,248,0.22)',
+            border: `1px solid ${cutP > 0.5 ? '#34d399' : '#38bdf8'}`,
+            fontFamily: FONT_MONO,
+            fontSize: 15,
+            fontWeight: 900,
+            color: cutP > 0.5 ? '#6ee7b7' : '#7dd3fc',
+          }}
+        >
+          {cutP > 0.5 ? 'CAM-B 50mm' : 'CAM-A 35mm'}
+        </span>
+      </div>
+
+      {hanazi && <HanaziPop spec={hanazi} />}
+    </AbsoluteFill>
+  );
+};
+
+const ChoreographedTransitionWrapperDirectorV4: React.FC<{
+  beat: BeatScene;
+  isFirst: boolean;
+  isLast: boolean;
+  nextBeat: BeatScene | null;
+  children: React.ReactNode;
+}> = ({ beat, isFirst, isLast, nextBeat, children }) => {
+  const localFrame = useCurrentFrame();
+  const seqDuration = beat.durationInFrames;
+
+  const selfReveals = beat.kind === 'three_lake' || beat.kind === 'three_ailao';
+  const fadeInFrames = beat.kind === 'three_battery' ? 6 : OVERLAP_FRAMES;
+  const fadeIn =
+    isFirst || selfReveals
+      ? 1
+      : interpolate(localFrame, [0, fadeInFrames], [0, 1], {
+          easing: Easing.inOut(Easing.cubic),
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+        });
+
+  const isDivingOut = !isLast && beat.kind === 'anime' && nextBeat !== null && nextBeat.kind !== 'anime';
+  const scaleOut = isDivingOut
+    ? interpolate(localFrame, [seqDuration - OVERLAP_FRAMES - 4, seqDuration], [1.0, 1.14], {
+        easing: Easing.in(Easing.cubic),
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      })
+    : 1.0;
+
+  return (
+    <AbsoluteFill
+      style={{
+        opacity: fadeIn,
+        transform: scaleOut !== 1 ? `scale(${scaleOut})` : undefined,
+        transformOrigin: 'center center',
+      }}
+    >
+      {children}
+    </AbsoluteFill>
+  );
+};
+
+/**
+ * Borderless Cinema Kinetic Subtitles (Upgraded to 40px base / 44px highlight per `aesthetic-rules.md` Q11!)
+ */
+const CinemaSubtitlesDirectorV4: React.FC<{ subtitles: SubtitleItem[] }> = ({ subtitles }) => {
+  const frame = useCurrentFrame();
+  const active = subtitles.find((s) => frame >= s.startFrame && frame <= s.endFrame);
+  if (!active) return null;
+
+  const lf = frame - active.startFrame;
+  const enterP = interpolate(lf, [0, 6], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const enterY = (1 - enterP) * 14;
+
+  const hiSpring = spring({
+    frame: Math.max(0, lf - 2),
+    fps: 30,
+    config: { damping: 13, stiffness: 210, mass: 0.9 },
+  });
+  const hiScale = 0.88 + 0.12 * hiSpring;
+
+  const isLin = active.speaker === 'linxiao';
+  const badgeBg = isLin ? '#0284c7' : '#059669';
+  const hiColor = isLin ? '#38bdf8' : '#fde047';
+
+  const parts =
+    active.highlight && active.text.includes(active.highlight)
+      ? active.text.split(active.highlight)
+      : [active.text];
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 1290,
+        left: 48,
+        width: 852,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 10,
+        opacity: enterP,
+        transform: `translateY(${enterY}px)`,
+        pointerEvents: 'none',
+        zIndex: 32,
+      }}
+    >
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '4px 16px',
+          borderRadius: 999,
+          backgroundColor: badgeBg,
+          border: '1px solid rgba(255,255,255,0.35)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.55)',
+        }}
+      >
+        <div
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            backgroundColor: '#ffffff',
+            boxShadow: '0 0 8px #ffffff',
+          }}
+        />
+        <span style={{ fontFamily: FONT_SANS, fontSize: 21, fontWeight: 900, color: '#ffffff' }}>
+          {active.speakerName}
+        </span>
+      </div>
+
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          fontFamily: FONT_SANS,
+          fontSize: 35,
+          fontWeight: 900,
+          lineHeight: 1.32,
+          letterSpacing: 0.3,
+          whiteSpace: 'nowrap',
+          color: '#ffffff',
+          textShadow:
+            '0 3px 0 rgba(2,8,16,0.96), 0 -2px 0 rgba(2,8,16,0.92), 2px 0 0 rgba(2,8,16,0.92), -2px 0 0 rgba(2,8,16,0.92), 0 8px 26px rgba(0,0,0,0.92)',
+        }}
+      >
+        {parts.length === 2 ? (
+          <>
+            {parts[0]}
+            <span
+              style={{
+                position: 'relative',
+                display: 'inline-block',
+                margin: '0 3px',
+                transform: `scale(${hiScale})`,
+                transformOrigin: 'center bottom',
+                color: hiColor,
+                fontSize: 38,
+                textShadow: `0 3px 0 rgba(2,8,16,0.98), 0 0 22px ${hiColor}88, 0 8px 24px rgba(0,0,0,0.92)`,
+              }}
+            >
+              {active.highlight}
+              <span
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  bottom: -2,
+                  width: `${Math.min(100, hiSpring * 100)}%`,
+                  height: 4,
+                  borderRadius: 4,
+                  backgroundColor: hiColor,
+                  boxShadow: `0 0 12px ${hiColor}`,
+                }}
+              />
+            </span>
+            {parts[1]}
+          </>
+        ) : (
+          active.text
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const YuxiDirectorV4: React.FC<YuxiVideoProps> = ({
+  locale,
+  timelineData,
+  audioFile,
+  showSafeZoneOverlay = false,
+}) => {
+  const frame = useCurrentFrame();
+  const pct = Math.min(100, (frame / Math.max(1, timelineData.totalFrames - 1)) * 100);
+
+  const flashFrames: number[] = [];
+  for (let i = 1; i < timelineData.scenes.length; i++) {
+    const prev = timelineData.scenes[i - 1];
+    const curr = timelineData.scenes[i];
+    if (prev.kind === 'anime' && curr.kind === 'anime' && (curr.id === 'B02' || curr.id === 'B11' || curr.id === 'B12')) {
+      flashFrames.push(Math.max(0, curr.startFrame - 2));
+    }
+  }
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#030b14' }}>
+      <Audio src={staticFile(audioFile)} />
+
+      {timelineData.scenes.map((beat, idx) => {
+        const isFirst = idx === 0;
+        const isLast = idx === timelineData.scenes.length - 1;
+        const nextBeat = idx < timelineData.scenes.length - 1 ? timelineData.scenes[idx + 1] : null;
+
+        return (
+          <Sequence key={beat.id} from={beat.startFrame} durationInFrames={beat.durationInFrames}>
+            <ChoreographedTransitionWrapperDirectorV4
+              beat={beat}
+              isFirst={isFirst}
+              isLast={isLast}
+              nextBeat={nextBeat}
+            >
+              {beat.kind === 'anime' && <AnimeDirectorLayerV4 beat={beat} locale={locale} index={idx} />}
+              {beat.kind === 'three_lake' && <FuxianLakeDirectorV4 locale={locale} />}
+              {beat.kind === 'code_fossil' && <ChengjiangDirectorV4 locale={locale} />}
+              {beat.kind === 'three_ailao' && <AilaoDirectorV4 locale={locale} />}
+              {beat.kind === 'three_battery' && <BatteryDirectorV4 locale={locale} />}
+            </ChoreographedTransitionWrapperDirectorV4>
+          </Sequence>
+        );
+      })}
+
+      {/* video-shotcraft warm-white FlashCut blooms on climax transitions */}
+      {flashFrames.map((ff, i) => (
+        <Sequence key={`flash-${i}`} from={ff} durationInFrames={12}>
+          <FlashCut duration={12} />
+        </Sequence>
+      ))}
+
+      {/* Polish.tsx Film Grain + Optical Vignette unifying 3D & DOM layers */}
+      <CinemaFilmFinish />
+
+      {/* Ultra-slim top progress thread */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 98,
+          left: 48,
+          width: 852,
+          height: 4,
+          borderRadius: 99,
+          backgroundColor: 'rgba(255,255,255,0.18)',
+          overflow: 'hidden',
+          zIndex: 35,
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, #38bdf8, #34d399, #fde047)',
+          }}
+        />
+      </div>
+
+      <CinemaSubtitlesDirectorV4 subtitles={timelineData.subtitles} />
+
+      {showSafeZoneOverlay && (
+        <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 50 }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 110, backgroundColor: 'rgba(239,68,68,0.22)', borderBottom: '2px dashed #ef4444' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 430, backgroundColor: 'rgba(239,68,68,0.22)', borderTop: '2px dashed #ef4444' }} />
+          <div style={{ position: 'absolute', top: 110, bottom: 430, right: 0, width: 170, backgroundColor: 'rgba(239,68,68,0.22)', borderLeft: '2px dashed #ef4444' }} />
+          <div
+            style={{
+              position: 'absolute',
+              top: 16,
+              left: 24,
+              fontFamily: FONT_MONO,
+              fontSize: 22,
+              fontWeight: 900,
+              color: '#fecaca',
+              backgroundColor: 'rgba(0,0,0,0.75)',
+              padding: '4px 12px',
+              borderRadius: 8,
+            }}
+          >
+            V4 DIRECTOR CUT 1-2-3 SAFE ZONE QA
+          </div>
+        </AbsoluteFill>
+      )}
+    </AbsoluteFill>
+  );
+};
